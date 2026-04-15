@@ -1,14 +1,13 @@
 // StretchTracker — Notification Logic
 
-// How notifications work on iOS PWA:
-// - App must be added to home screen (iOS 16.4+)
-// - No server = no true background push
-// - We check scheduled times on every app open / visibility change
-// - If current time falls within 30 min after a scheduled time
-//   and we haven't fired that slot today, we fire the notification
-// - The SW handles notificationclick to route back into the app
+// ===== CONFIGURATION =====
+// After deploying the Cloudflare Worker, paste your worker URL here:
+const PUSH_SERVER_URL = 'REPLACE_WITH_YOUR_WORKER_URL'
 
-const NOTIFY_WINDOW_MINUTES = 30
+// VAPID public key — must match the key used by the Cloudflare Worker
+const VAPID_PUBLIC_KEY = 'BI33qiby5ZUnTDAMxAoU39GjEv4jhcdAtmJQ7uURKW_pIpG5771dLCtRo9aCeal7KhH_ZiolCdZjs2iN5aysats'
+
+// ===== Utilities =====
 
 function getNotificationPermission() {
   if (!('Notification' in window)) return 'unsupported'
@@ -18,130 +17,202 @@ function getNotificationPermission() {
 async function requestNotificationPermission() {
   if (!('Notification' in window)) return 'unsupported'
   if (Notification.permission === 'granted') return 'granted'
-  const result = await Notification.requestPermission()
-  return result
+  return Notification.requestPermission()
 }
 
-// Returns true if the app is running as an installed PWA (standalone mode).
-// iOS only shows notifications from installed PWAs.
 function isInstalledPWA() {
   return window.matchMedia('(display-mode: standalone)').matches ||
          window.navigator.standalone === true
 }
 
-// Parse "HH:MM" string into { h, m }
-function parseTime(timeStr) {
-  const [h, m] = timeStr.split(':').map(Number)
-  return { h, m }
+function isPushConfigured() {
+  return PUSH_SERVER_URL !== 'REPLACE_WITH_YOUR_WORKER_URL' && PUSH_SERVER_URL !== ''
 }
 
-// Get the number of minutes since midnight for "now"
+// Convert a base64url string to a Uint8Array (needed for applicationServerKey)
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from(raw, c => c.charCodeAt(0))
+}
+
+// ===== Push Subscription =====
+
+async function getPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
+  try {
+    const reg = await navigator.serviceWorker.ready
+    return reg.pushManager.getSubscription()
+  } catch { return null }
+}
+
+async function subscribeToPush() {
+  if (!isPushConfigured()) return null
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
+  if (getNotificationPermission() !== 'granted') return null
+
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const existing = await reg.pushManager.getSubscription()
+    if (existing) return existing
+
+    return reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    })
+  } catch (err) {
+    console.error('Push subscribe failed:', err)
+    return null
+  }
+}
+
+// Send the push subscription + schedule to the Cloudflare Worker
+async function syncToServer(subscription) {
+  if (!isPushConfigured() || !subscription) return false
+  try {
+    const state = getState()
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const res = await fetch(`${PUSH_SERVER_URL}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: subscription.toJSON(),
+        schedule: state.settings.notifications,
+        timezone
+      })
+    })
+    return res.ok
+  } catch (err) {
+    console.error('Failed to sync to push server:', err)
+    return false
+  }
+}
+
+// Update only the schedule on the server (call when settings change)
+async function updateServerSchedule() {
+  if (!isPushConfigured()) return false
+  const subscription = await getPushSubscription()
+  if (!subscription) return false
+  try {
+    const state = getState()
+    const res = await fetch(`${PUSH_SERVER_URL}/schedule`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedule: state.settings.notifications })
+    })
+    return res.ok
+  } catch { return false }
+}
+
+// ===== Full Setup Flow =====
+// Called after permission is granted. Subscribes to push and syncs to server.
+async function setupPushNotifications() {
+  const subscription = await subscribeToPush()
+  if (!subscription) return false
+  return syncToServer(subscription)
+}
+
+// ===== Test Notification =====
+// Fires immediately — useful for verifying notifications work at all
+async function sendTestNotification() {
+  if (getNotificationPermission() !== 'granted') return false
+  try {
+    const reg = await navigator.serviceWorker.ready
+    await reg.showNotification('Test — StretchTracker 🙌', {
+      body: 'Notifications are working correctly!',
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      tag: 'stretch-test'
+    })
+    return true
+  } catch (err) {
+    // Fallback: plain Notification
+    if (getNotificationPermission() === 'granted') {
+      new Notification('Test — StretchTracker 🙌', {
+        body: 'Notifications are working correctly!',
+        icon: './icons/icon-192.png'
+      })
+      return true
+    }
+    return false
+  }
+}
+
+// ===== Fallback: in-app check when app is opened =====
+// Fires a notification if the app is opened within 30 min of a scheduled time
+// (works without the push server, but only when the app is opened)
+
+const NOTIFY_WINDOW_MINUTES = 30
+
 function minutesSinceMidnight() {
   const now = new Date()
   return now.getHours() * 60 + now.getMinutes()
 }
 
-// Check if we should fire a notification for a given scheduled time slot.
-// Returns true if:
-//   - current time is >= scheduled time
-//   - current time is < scheduled time + NOTIFY_WINDOW_MINUTES
 function isWithinWindow(timeStr) {
-  const { h, m } = parseTime(timeStr)
-  const scheduledMinutes = h * 60 + m
-  const nowMinutes = minutesSinceMidnight()
-  return nowMinutes >= scheduledMinutes && nowMinutes < scheduledMinutes + NOTIFY_WINDOW_MINUTES
+  const [h, m] = timeStr.split(':').map(Number)
+  const scheduled = h * 60 + m
+  const now = minutesSinceMidnight()
+  return now >= scheduled && now < scheduled + NOTIFY_WINDOW_MINUTES
 }
 
-// Fire a notification via the service worker registration.
-// Falls back to Notification constructor if SW isn't available.
-async function fireNotification(category) {
-  const title = 'Time to Stretch! 🙌'
-  const body = category === 'carpal'
-    ? 'Quick hand & wrist stretch — takes just 5 minutes.'
-    : 'Daily leg & foot stretch — your body will thank you.'
-  const icon = './icons/icon-192.png'
-  const options = { body, icon, badge: icon, data: { category }, tag: `stretch-${category}` }
-
-  try {
-    const reg = await navigator.serviceWorker.ready
-    reg.showNotification(title, options)
-  } catch {
-    // Fallback when SW isn't ready
-    if (Notification.permission === 'granted') {
-      new Notification(title, options)
-    }
-  }
-}
-
-// Main check: called on every app focus / visibility change.
-// Reads the schedule from state and fires any overdue notifications.
 async function checkAndFirePending() {
   if (getNotificationPermission() !== 'granted') return
   if (!('serviceWorker' in navigator)) return
 
+  // If push server is configured and subscription exists, skip in-app fallback
+  // (the server handles delivery even when app is closed)
+  if (isPushConfigured()) {
+    const sub = await getPushSubscription()
+    if (sub) return  // server handles it
+  }
+
   const state = getState()
   const settings = state.settings.notifications
-  const firedToday = state.notifications.firedToday
-
+  const firedToday = state.notifications.firedToday || { carpal: [], legs: [] }
+  let updatedFired = { ...firedToday }
   let changed = false
 
   for (const category of ['carpal', 'legs']) {
-    const catSettings = settings[category]
-    if (!catSettings.enabled) continue
-
-    for (const timeStr of catSettings.times) {
+    const cat = settings[category]
+    if (!cat.enabled) continue
+    for (const timeStr of cat.times) {
       if (!isWithinWindow(timeStr)) continue
-      if ((firedToday[category] || []).includes(timeStr)) continue
+      if ((updatedFired[category] || []).includes(timeStr)) continue
 
-      // Fire the notification
-      await fireNotification(category)
-
-      // Record as fired
-      const updatedFired = {
-        ...firedToday,
-        [category]: [...(firedToday[category] || []), timeStr]
-      }
-      setState({
-        notifications: {
-          ...state.notifications,
-          lastChecked: new Date().toISOString(),
-          firedToday: updatedFired
-        }
-      })
-      changed = true
-
-      // Also tell the SW about the updated schedule so it can persist state
       try {
         const reg = await navigator.serviceWorker.ready
-        reg.active && reg.active.postMessage({
-          type: 'UPDATE_FIRED_TODAY',
-          firedToday: updatedFired
+        await reg.showNotification('Time to Stretch! 🙌', {
+          body: category === 'carpal'
+            ? 'Quick hand & wrist stretch — takes just 5 minutes.'
+            : 'Daily leg & foot stretch — your body will thank you.',
+          icon: './icons/icon-192.png',
+          badge: './icons/icon-192.png',
+          data: { category },
+          tag: `stretch-${category}`
         })
-      } catch {}
+      } catch {
+        if (getNotificationPermission() === 'granted') {
+          new Notification('Time to Stretch! 🙌', {
+            body: category === 'carpal' ? 'Hand & wrist stretch.' : 'Leg & foot stretch.',
+            icon: './icons/icon-192.png'
+          })
+        }
+      }
+
+      updatedFired[category] = [...(updatedFired[category] || []), timeStr]
+      changed = true
     }
   }
 
-  // Always update lastChecked timestamp
-  if (!changed) {
+  if (changed) {
     setState({
       notifications: {
-        ...getState().notifications,
-        lastChecked: new Date().toISOString()
+        ...state.notifications,
+        lastChecked: new Date().toISOString(),
+        firedToday: updatedFired
       }
     })
   }
-}
-
-// Post the full notification schedule to the service worker for its own reference.
-async function syncScheduleToSW() {
-  if (!('serviceWorker' in navigator)) return
-  try {
-    const reg = await navigator.serviceWorker.ready
-    const state = getState()
-    reg.active && reg.active.postMessage({
-      type: 'SYNC_SCHEDULE',
-      schedule: state.settings.notifications,
-      firedToday: state.notifications.firedToday
-    })
-  } catch {}
 }

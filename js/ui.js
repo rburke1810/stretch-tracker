@@ -326,10 +326,12 @@ function renderCompletion({ category, stretchCount, durationMs }) {
 }
 
 // ===== Settings View =====
-function renderSettings() {
+async function renderSettings() {
   const state = getState()
   const { settings } = state
   const permission = getNotificationPermission()
+  const pushSub = await getPushSubscription()
+  const pushActive = !!pushSub && isPushConfigured()
 
   const carpalTimes = settings.notifications.carpal.times
   const legsTimes   = settings.notifications.legs.times
@@ -428,23 +430,50 @@ function renderSettings() {
       </div>
 
       <div class="settings-section">
-        <p class="settings-section-title">Permissions</p>
+        <p class="settings-section-title">Notifications</p>
         <div class="settings-group">
           <div class="settings-row">
-            <div class="settings-row-label">Notifications</div>
+            <div class="settings-row-label">Permission</div>
             <span class="permission-badge ${permissionBadgeClass}">${permissionLabel}</span>
           </div>
-          ${permission !== 'granted' ? `
+          ${permission === 'granted' ? `
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Background Push</div>
+              <div class="settings-row-sub">${pushActive ? 'Active — works when app is closed' : isPushConfigured() ? 'Not subscribed yet' : 'Push server not set up'}</div>
+            </div>
+            <span class="permission-badge ${pushActive ? 'granted' : 'default'}">${pushActive ? 'Active' : 'Off'}</span>
+          </div>
+          ${!pushActive && isPushConfigured() ? `
+          <div class="settings-row">
+            <button class="btn btn-secondary btn-sm w-full" id="btn-subscribe-push" style="margin:0">
+              ${Icons.bell} &nbsp;Enable Background Push
+            </button>
+          </div>
+          ` : ''}
+          <div class="settings-row">
+            <button class="btn btn-secondary btn-sm w-full" id="btn-test-notif" style="margin:0">
+              ${Icons.bell} &nbsp;Send Test Notification
+            </button>
+          </div>
+          ` : `
           <div class="settings-row">
             <button class="btn btn-secondary btn-sm w-full" id="btn-req-permission" style="margin:0">
               ${Icons.bell} &nbsp;Request Permission
             </button>
           </div>
-          ` : ''}
+          `}
           ${permission === 'denied' ? `
           <div class="settings-row">
             <p class="text-muted" style="font-size:13px;line-height:1.5">
-              Notifications are blocked. Go to <strong>iOS Settings → StretchTracker → Notifications</strong> to re-enable.
+              Blocked. Go to <strong>iOS Settings → StretchTracker → Notifications</strong> to re-enable.
+            </p>
+          </div>
+          ` : ''}
+          ${!isInstalledPWA() ? `
+          <div class="settings-row">
+            <p class="text-muted" style="font-size:13px;line-height:1.5">
+              Add to Home Screen in Safari for notifications to work on iOS.
             </p>
           </div>
           ` : ''}
@@ -512,7 +541,7 @@ function renderSettings() {
   })
 
   function saveSettings() {
-    const newState = setState({
+    setState({
       settings: {
         sessionDurationMinutes: dur,
         timePerStretchSeconds:  strSec,
@@ -534,7 +563,7 @@ function renderSettings() {
         }
       }
     })
-    syncScheduleToSW()
+    updateServerSchedule()
   }
 
   // Permission request
@@ -543,9 +572,34 @@ function renderSettings() {
     permBtn.addEventListener('click', async () => {
       const result = await requestNotificationPermission()
       if (result === 'granted') {
-        await syncScheduleToSW()
-        renderSettings() // re-render to show updated permission badge
+        await setupPushNotifications()
+        renderSettings()
       }
+    })
+  }
+
+  // Subscribe to background push
+  const subBtn = document.getElementById('btn-subscribe-push')
+  if (subBtn) {
+    subBtn.addEventListener('click', async () => {
+      subBtn.textContent = 'Connecting…'
+      subBtn.disabled = true
+      const ok = await setupPushNotifications()
+      if (ok) {
+        renderSettings()
+      } else {
+        subBtn.textContent = 'Failed — check server URL'
+        subBtn.disabled = false
+      }
+    })
+  }
+
+  // Test notification
+  const testBtn = document.getElementById('btn-test-notif')
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      const ok = await sendTestNotification()
+      if (!ok) alert('Could not send test notification. Make sure permission is granted and the app is installed to your home screen.')
     })
   }
 
@@ -596,8 +650,8 @@ function renderPermissionModal() {
     modal.remove()
     const result = await requestNotificationPermission()
     if (result === 'granted') {
-      await syncScheduleToSW()
-      renderHome() // re-render to hide banner
+      await setupPushNotifications()
+      renderHome()
     }
   })
 

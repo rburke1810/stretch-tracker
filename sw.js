@@ -1,7 +1,7 @@
 // StretchTracker — Service Worker
-// Handles: offline caching, notification display, notification click routing
+// Handles: offline caching, push events (from server), notification click routing
 
-const CACHE_NAME = 'stretchtracker-v1'
+const CACHE_NAME = 'stretchtracker-v2'
 
 const ASSETS = [
   './',
@@ -95,23 +95,32 @@ self.addEventListener('notificationclick', event => {
   )
 })
 
-// ===== Message Handler =====
-// Receives messages from the main thread (app.js / notifications.js)
-self.addEventListener('message', event => {
-  const { type } = event.data || {}
-
-  if (type === 'SYNC_SCHEDULE' || type === 'UPDATE_FIRED_TODAY') {
-    // Store schedule info in cache for potential future use
-    // (Persisting in SW memory isn't reliable across terminations)
-    caches.open(CACHE_NAME).then(cache => {
-      const payload = JSON.stringify(event.data)
-      const response = new Response(payload, {
-        headers: { 'Content-Type': 'application/json' }
-      })
-      cache.put('./sw-schedule.json', response)
-    })
+// ===== Push Event: fired by the Cloudflare Worker push server =====
+self.addEventListener('push', event => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = { title: 'Time to Stretch! 🙌', body: 'Open the app to start your session.', category: 'carpal' }
   }
 
+  const title = data.title || 'Time to Stretch! 🙌'
+  const options = {
+    body:    data.body   || 'Time for your stretch session.',
+    icon:    './icons/icon-192.png',
+    badge:   './icons/icon-192.png',
+    data:    { category: data.category || 'carpal' },
+    tag:     `stretch-${data.category || 'carpal'}`,
+    actions: [{ action: 'start', title: 'Start Now' }],
+    requireInteraction: false
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+// ===== Message Handler =====
+self.addEventListener('message', event => {
+  const { type } = event.data || {}
   if (type === 'SKIP_WAITING') {
     self.skipWaiting()
   }
