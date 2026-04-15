@@ -17,7 +17,7 @@
  * KV namespace binding: STRETCH_KV
  */
 
-const VAPID_PUBLIC_KEY = 'BI33qiby5ZUnTDAMxAoU39GjEv4jhcdAtmJQ7uURKW_pIpG5771dLCtRo9aCeal7KhH_ZiolCdZjs2iN5aysats'
+const VAPID_PUBLIC_KEY = 'BNimBpl8w_y9e3H4x3SCgV27YuL3LdLjonXxYUNeR6o_bPUsFT954P6vASM21VYn2qKay5aXDuQj8g27uw8rvQ8'
 
 // ── Base64url helpers ─────────────────────────────────────────────────────────
 
@@ -50,17 +50,31 @@ async function vapidHeaders(endpoint, vapidPrivateKeyB64, email) {
   const claims = b64url(enc.encode(JSON.stringify({ aud, exp, sub: email })))
   const unsigned = `${header}.${claims}`
 
-  // Build JWK from raw key bytes
-  const pubBytes = b64urlDecode(VAPID_PUBLIC_KEY)
-  const jwk = {
-    kty: 'EC', crv: 'P-256',
-    x: b64url(pubBytes.slice(1, 33)),
-    y: b64url(pubBytes.slice(33, 65)),
-    d: b64url(b64urlDecode(vapidPrivateKeyB64)),
-    key_ops: ['sign']
-  }
+  // Build PKCS8 DER from raw private key scalar
+  // ECPrivateKey (RFC 5915) wrapped in PKCS8 (RFC 5958) with P-256 OID
+  const privBytes = b64urlDecode(vapidPrivateKeyB64)
+  const pubBytes  = b64urlDecode(VAPID_PUBLIC_KEY)
+  // ECPrivateKey ::= SEQUENCE { version INTEGER(1), privateKey OCTET STRING, publicKey [1] BIT STRING }
+  const ecPrivKey = concat(
+    new Uint8Array([0x30, 0x6b, 0x02, 0x01, 0x01, 0x04, 0x20]),  // SEQUENCE(107), version=1, OCTET STRING(32)
+    privBytes,
+    new Uint8Array([0xa1, 0x44, 0x03, 0x42, 0x00]),               // [1](68), BIT STRING(66), 0 unused bits
+    pubBytes
+  )
+  // PKCS8 AlgorithmIdentifier for id-ecPublicKey + secp256r1 OID
+  const pkcs8 = concat(
+    new Uint8Array([
+      0x30, 0x81, 0x87,              // SEQUENCE
+      0x02, 0x01, 0x00,              // version = 0
+      0x30, 0x13,                    // AlgorithmIdentifier SEQUENCE
+        0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, // id-ecPublicKey OID
+        0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, // secp256r1 OID
+      0x04, 0x6d,                    // OCTET STRING wrapping ECPrivateKey
+    ]),
+    ecPrivKey
+  )
 
-  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+  const key = await crypto.subtle.importKey('pkcs8', pkcs8, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
   const sig  = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(unsigned))
 
   return {
