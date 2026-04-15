@@ -5,7 +5,7 @@
 const PUSH_SERVER_URL = 'https://stretch-tracker-push.rburke-stretch.workers.dev'
 
 // VAPID public key — must match the key used by the Cloudflare Worker
-const VAPID_PUBLIC_KEY = 'BNimBpl8w_y9e3H4x3SCgV27YuL3LdLjonXxYUNeR6o_bPUsFT954P6vASM21VYn2qKay5aXDuQj8g27uw8rvQ8'
+const VAPID_PUBLIC_KEY = 'BHtdwNW_GEqwecoDkXnUG_kNZAQm7MVczYQHN7ph9ns56K-NHSGdVg3Pabhmje_tfXy5LAtjo03s-JHXJ9fxW-M'
 
 // ===== Utilities =====
 
