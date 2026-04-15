@@ -46,6 +46,35 @@ const STRETCHES = [
     instructions: 'Hold one hand out in front of you, palm facing up. Use your other hand to gently pull your thumb back toward your wrist until you feel a stretch at the base of the thumb. Hold, then switch hands.',
     muscles: 'Thenar muscles, Thumb ligaments'
   },
+  {
+    id: 'ct-7',
+    name: 'Finger Fan',
+    category: 'carpal',
+    instructions: 'Hold one hand out in front of you. Spread all fingers as wide apart as possible and hold for 3 seconds, then curl tightly into a full fist. Repeat slowly for the full duration — both hands.',
+    muscles: 'Intrinsic hand muscles'
+  },
+  {
+    id: 'ct-8',
+    name: 'Reverse Prayer',
+    category: 'carpal',
+    instructions: 'Place the backs of your hands together with fingers pointing downward in front of your chest. Gently press inward until you feel a stretch across the tops of your wrists and forearms. Hold.',
+    muscles: 'Wrist extensors'
+  },
+  {
+    id: 'ct-9',
+    name: 'Finger Opposition',
+    category: 'carpal',
+    instructions: 'Touch your thumb tip to each fingertip in sequence — index, middle, ring, little — then reverse back. Do this slowly and deliberately, making a clean O-shape each time. 5 complete rounds per hand.',
+    muscles: 'Intrinsic hand muscles, Thenar muscles'
+  },
+  {
+    id: 'ct-10',
+    name: 'Shake Hands Out',
+    category: 'carpal',
+    alwaysLast: true,
+    instructions: 'Let both arms hang loose at your sides. Gently shake your hands and wrists out for the full duration — like you\'re flicking water off your fingertips. Let everything go completely limp.',
+    muscles: 'Full hand and wrist release'
+  },
 
   // ===== Leg & Feet Stretches =====
   // NOTE: Replace these with your prescribed stretches.

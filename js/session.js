@@ -13,24 +13,27 @@ function fisherYates(arr) {
 // Build a session queue for the given category and settings.
 // Returns an array of stretch objects, each with durationSeconds set.
 function buildSessionQueue(category, settings) {
-  const pool = STRETCHES.filter(s => s.category === category)
+  const all       = STRETCHES.filter(s => s.category === category)
+  const pool      = all.filter(s => !s.alwaysLast)
+  const lastItems = all.filter(s => s.alwaysLast)
   if (pool.length === 0) return []
 
   const totalSeconds = settings.sessionDurationMinutes * 60
   const perStretch   = settings.timePerStretchSeconds
-  const count        = Math.max(1, Math.floor(totalSeconds / perStretch))
+  // Reserve slots for the always-last stretches
+  const count = Math.max(1, Math.floor(totalSeconds / perStretch) - lastItems.length)
 
-  const shuffled = fisherYates(pool)
   const queue = []
   while (queue.length < count) {
     queue.push(...fisherYates(pool))
   }
+  const full = [...queue.slice(0, count), ...lastItems]
 
-  return queue.slice(0, count).map((stretch, i) => ({
+  return full.map((stretch, i) => ({
     ...stretch,
     durationSeconds: perStretch,
     index: i,
-    total: count
+    total: full.length
   }))
 }
 
