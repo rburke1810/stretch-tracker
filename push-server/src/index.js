@@ -47,7 +47,8 @@ async function vapidHeaders(endpoint, vapidPrivateJwk, email) {
 
   const enc = new TextEncoder()
   const header = b64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
-  const claims = b64url(enc.encode(JSON.stringify({ aud, exp, sub: email })))
+  const sub = email.startsWith('mailto:') || email.startsWith('https:') ? email : `mailto:${email}`
+  const claims = b64url(enc.encode(JSON.stringify({ aud, exp, sub })))
   const unsigned = `${header}.${claims}`
 
   // Import directly from JWK — no manual DER construction needed
@@ -181,7 +182,9 @@ export default {
         const aud = 'https://api.push.apple.com'
         const exp = Math.floor(Date.now() / 1000) + 3600
         const header = b64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
-        const claims = b64url(enc.encode(JSON.stringify({ aud, exp, sub: env.VAPID_EMAIL })))
+        const email = env.VAPID_EMAIL
+        const sub = email.startsWith('mailto:') || email.startsWith('https:') ? email : `mailto:${email}`
+        const claims = b64url(enc.encode(JSON.stringify({ aud, exp, sub })))
         const unsigned = `${header}.${claims}`
         const jwk = JSON.parse(env.VAPID_PRIVATE_JWK)
         const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
