@@ -6,66 +6,45 @@ const STRETCHES = [
   // ===== Carpal Tunnel Stretches =====
   {
     id: 'ct-1',
-    name: 'Prayer Stretch',
-    category: 'carpal',
-    instructions: 'Press palms together in front of your chest, fingers pointing up. Slowly lower joined hands toward your waist until you feel a stretch in your wrists and forearms. Hold.',
-    muscles: 'Wrist flexors'
-  },
-  {
-    id: 'ct-2',
-    name: 'Reverse Prayer',
-    category: 'carpal',
-    instructions: 'Place the backs of your hands together with fingers pointing down below your chest. Gently press inward and downward until you feel the stretch across the top of your wrists. Hold.',
-    muscles: 'Wrist extensors'
-  },
-  {
-    id: 'ct-3',
     name: 'Wrist Flexor Stretch',
     category: 'carpal',
     instructions: 'Extend one arm straight out, palm facing up. Use your other hand to gently pull the fingers back toward your body. Hold, then switch sides. Keep elbow straight.',
     muscles: 'Forearm flexors'
   },
   {
-    id: 'ct-4',
+    id: 'ct-2',
     name: 'Wrist Extensor Stretch',
     category: 'carpal',
     instructions: 'Extend one arm out, palm facing down with fingers curled. Use your other hand to gently pull your hand downward toward the floor. Hold, then switch sides.',
     muscles: 'Forearm extensors'
   },
   {
-    id: 'ct-5',
-    name: 'Finger Fan',
-    category: 'carpal',
-    instructions: 'Hold one hand out in front of you. Spread all fingers as wide apart as possible and hold for 3 seconds, then curl tightly into a full fist. Repeat slowly for the full duration — both hands.',
-    muscles: 'Intrinsic hand muscles'
-  },
-  {
-    id: 'ct-6',
-    name: 'Thumb Circles',
-    category: 'carpal',
-    instructions: 'Hold one hand out, fingers relaxed. Make slow, deliberate circles with your thumb — 5 circles clockwise, then 5 counter-clockwise. Switch hands and repeat.',
-    muscles: 'Thenar muscles'
-  },
-  {
-    id: 'ct-7',
-    name: 'Wrist Circles',
-    category: 'carpal',
-    instructions: 'Clasp your hands loosely together in front of you. Rotate both wrists together in full smooth circles — 5 times in each direction. Move slowly and deliberately.',
-    muscles: 'Wrist joint'
-  },
-  {
-    id: 'ct-8',
-    name: 'Nerve Glide',
+    id: 'ct-3',
+    name: 'Median Nerve Glide',
     category: 'carpal',
     instructions: 'Extend one arm straight out to your side, palm facing up. Slowly tilt your head away from that arm while pointing fingers down toward the floor. Return and repeat 5 times, then switch sides.',
     muscles: 'Median nerve'
   },
   {
-    id: 'ct-9',
+    id: 'ct-4',
     name: 'Tendon Glides',
     category: 'carpal',
     instructions: 'Start with fingers fully straight. Progress through each position slowly: hook fist (fingertips to palm base), full fist, tabletop (fingers flat, knuckles bent), then back to straight. 5 reps per hand.',
     muscles: 'Finger flexor tendons'
+  },
+  {
+    id: 'ct-5',
+    name: 'Prayer Stretch',
+    category: 'carpal',
+    instructions: 'Press palms together in front of your chest, fingers pointing up. Slowly lower joined hands toward your waist until you feel a stretch in your wrists and forearms. Hold.',
+    muscles: 'Wrist flexors'
+  },
+  {
+    id: 'ct-6',
+    name: 'Thumb Stretch',
+    category: 'carpal',
+    instructions: 'Hold one hand out in front of you, palm facing up. Use your other hand to gently pull your thumb back toward your wrist until you feel a stretch at the base of the thumb. Hold, then switch hands.',
+    muscles: 'Thenar muscles, Thumb ligaments'
   },
 
   // ===== Leg & Feet Stretches =====
