@@ -450,6 +450,12 @@ async function renderSettings() {
               ${Icons.bell} &nbsp;Enable Background Push
             </button>
           </div>
+          ` : pushActive ? `
+          <div class="settings-row">
+            <button class="btn btn-secondary btn-sm w-full" id="btn-resubscribe-push" style="margin:0">
+              ${Icons.bell} &nbsp;Refresh Push Subscription
+            </button>
+          </div>
           ` : ''}
           <div class="settings-row">
             <button class="btn btn-secondary btn-sm w-full" id="btn-test-notif" style="margin:0">
@@ -591,6 +597,25 @@ async function renderSettings() {
         subBtn.textContent = 'Failed — check server URL'
         subBtn.disabled = false
       }
+    })
+  }
+
+  // Refresh push subscription (force resubscribe after VAPID key rotation)
+  const resubBtn = document.getElementById('btn-resubscribe-push')
+  if (resubBtn) {
+    resubBtn.addEventListener('click', async () => {
+      resubBtn.textContent = 'Reconnecting…'
+      resubBtn.disabled = true
+      const subscription = await resubscribeToPush()
+      if (subscription) {
+        const ok = await syncToServer(subscription)
+        if (ok) {
+          renderSettings()
+          return
+        }
+      }
+      resubBtn.textContent = 'Failed — try again'
+      resubBtn.disabled = false
     })
   }
 

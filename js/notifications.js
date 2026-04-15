@@ -67,6 +67,26 @@ async function subscribeToPush() {
   }
 }
 
+async function resubscribeToPush() {
+  if (!isPushConfigured()) return null
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
+  if (getNotificationPermission() !== 'granted') return null
+
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const existing = await reg.pushManager.getSubscription()
+    if (existing) await existing.unsubscribe()
+
+    return reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    })
+  } catch (err) {
+    console.error('Push resubscribe failed:', err)
+    return null
+  }
+}
+
 // Send the push subscription + schedule to the Cloudflare Worker
 async function syncToServer(subscription) {
   if (!isPushConfigured() || !subscription) return false
