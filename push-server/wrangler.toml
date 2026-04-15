@@ -1,7 +1,6 @@
 name = "stretch-tracker-push"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
-node_compat = true
 
 # KV namespace for storing subscription + schedule
 # After running `wrangler kv namespace create STRETCH_KV`, paste the id below
