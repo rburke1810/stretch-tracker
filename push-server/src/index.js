@@ -175,6 +175,28 @@ export default {
       } catch (e) { return json({ error: e.message }, 500) }
     }
 
+    if (request.method === 'GET' && url.pathname === '/debug-jwt') {
+      try {
+        const enc = new TextEncoder()
+        const aud = 'https://api.push.apple.com'
+        const exp = Math.floor(Date.now() / 1000) + 3600
+        const header = b64url(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
+        const claims = b64url(enc.encode(JSON.stringify({ aud, exp, sub: env.VAPID_EMAIL })))
+        const unsigned = `${header}.${claims}`
+        const jwk = JSON.parse(env.VAPID_PRIVATE_JWK)
+        const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+        const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(unsigned))
+        const sigBytes = new Uint8Array(sig)
+        return json({
+          jwt: `${unsigned}.${b64url(sig)}`,
+          sig_length: sigBytes.length,
+          jwk_kty: jwk.kty, jwk_crv: jwk.crv,
+          public_key: VAPID_PUBLIC_KEY,
+          email: env.VAPID_EMAIL
+        })
+      } catch (e) { return json({ error: e.message, stack: e.stack }, 500) }
+    }
+
     return new Response('Not Found', { status: 404 })
   },
 
