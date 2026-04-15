@@ -6,8 +6,8 @@ compatibility_date = "2025-01-01"
 # After running `wrangler kv namespace create STRETCH_KV`, paste the id below
 [[kv_namespaces]]
 binding = "STRETCH_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "ac5be1cb506840cc92da734b98f47829"
 
 # Cron: run every 10 minutes to check for due notifications
 [triggers]
-crons = ["*/10 * * * *"]
+crons = ["* * * * *"]

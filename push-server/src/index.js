@@ -261,7 +261,7 @@ export default {
     const firedToday   = firedTodayStr ? JSON.parse(firedTodayStr) : { carpal: [], legs: [] }
 
     let changed = false
-    const WINDOW = 10  // fire within 10-minute window (matches cron interval)
+    const WINDOW = 1  // fire within 1-minute window (matches cron interval)
 
     for (const [category, settings] of Object.entries(schedule)) {
       if (!settings || !settings.enabled) continue
